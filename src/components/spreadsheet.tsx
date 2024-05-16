@@ -4,56 +4,110 @@ import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import useSpreadSheetContext from '@/hooks/useSpreadSheetContext';
 import Image from 'next/image';
+import { Input } from './ui/input';
+import { cn } from '@/lib/utils';
+import { Button } from './ui/button';
 
 function Spreadsheet() {
-  const { cellValues, handleCellValueChange, handleBlur, handleFocus, focusedCell, columns, rows } = useSpreadSheetContext();
+  const { cellValues, handleCellValueChange, handleBlur, handleFocus, clearCellValue, focusedCell, columns, rows } = useSpreadSheetContext();
   const headers = Array.from({ length: columns }, (_, colIndex) => String.fromCharCode(65 + colIndex));
 
-  return (
-    <Table className="w-full border-separate border-spacing-0">
-      <TableHeader className="sticky top-0 z-10 bg-gray-200">
-        <TableRow className="flex text-sm text-center font-medium text-gray-700">
-          {headers.map((header) => (
-            <TableHead key={header} className="flex-1 flex items-center justify-center h-12 bg-gray-200 border-b border-gray-300">
-              {header}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody className="text-sm text-gray-800">
-        {[...Array(rows)].map((_, rowIndex) => {
-          const rowId = (rowIndex + 1).toString();
-          return (
-            <TableRow key={rowId} className="flex bg-white hover:bg-gray-50 h-12 border-b border-gray-200">
-              {headers.map((header) => {
-                const cell = `${header}${rowId}`;
-                const cellValue = cellValues[cell]?.value || '';
+  const isError = (cell: string) => {
+    const cellValue = cellValues[cell]?.value;
+    return cellValue === '#ERROR' || cellValue === '#CIRCULAR_REF';
+  };
 
-                return (
-                  <TableCell key={cell} className="flex-1 flex items-center justify-center relative px-3 border-r border-gray-300">
-                    <form onSubmit={(e) => e.preventDefault()} className="flex justify-between items-center h-full w-full">
-                      {focusedCell === cell ? (
-                        <input
-                          type="text"
-                          value={cellValue}
-                          onChange={(e) => handleCellValueChange(cell, e.target.value)}
-                          onBlur={() => handleBlur(cell)}
-                          onFocus={() => handleFocus(cell)}
-                          className="text-center text-gray-900 w-full"
+  return (
+    <div>
+      <Table className="w-full border-separate border-spacing-0">
+        <TableHeader className="sticky top-0 z-10">
+          <TableRow className="flex bg-defaultDarker rounded-lg mb-4 border-none">
+            {headers.map((header, index) => (
+              <TableHead
+                key={header}
+                className={cn('flex items-center text-black justify-center h-12 border-gray-300', {
+                  'basis-30p4': index < headers.length - 1,
+                  'basis-39p2': index === headers.length - 1,
+                })}
+              >
+                {header}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody className="text-sm text-gray-900">
+          {[...Array(rows)].map((_, rowIndex) => {
+            const rowId = (rowIndex + 1).toString();
+            const rowHasError = headers.some((header) => isError(`${header}${rowId}`));
+            const rowIsFocused = headers.some((header) => focusedCell?.endsWith(rowId));
+
+            return (
+              <TableRow
+                key={rowId}
+                className={cn('flex h-12 mb-2 rounded-md bg-cell', {
+                  'bg-highlight': rowIsFocused,
+                  'border-red-500 bg-red-100 border': rowHasError,
+                  'border-none': !rowHasError,
+                })}
+              >
+                {headers.map((header, index) => {
+                  const cell = `${header}${rowId}`;
+                  const cellValue = cellValues[cell]?.value || '';
+                  let placeholder = '';
+                  if (header === 'C') {
+                    placeholder = `=A${rowId}*B${rowId}`;
+                  }
+
+                  return (
+                    <TableCell
+                      key={cell}
+                      className={cn('flex-1 flex items-center justify-center relative border-r', {
+                        'basis-30p4': index < headers.length - 1,
+                        'basis-39p2': index === headers.length - 1,
+                        'bg-highlight': focusedCell === cell,
+                        'shadow-md': focusedCell === cell,
+                        'bg-opacity-70': rowIsFocused && focusedCell !== cell,
+
+                        'last:border-none': index === headers.length - 1,
+                      })}
+                      onClick={() => handleFocus(cell)}
+                    >
+                      <form onSubmit={(e) => e.preventDefault()} className="flex justify-between items-center h-full w-full border-none">
+                        {focusedCell === cell ? (
+                          <>
+                            <Input
+                              type="text"
+                              value={cellValue}
+                              onChange={(e) => handleCellValueChange(cell, e.target.value)}
+                              onBlur={() => handleBlur(cell)}
+                              placeholder={placeholder}
+                              className="text-center text-gray-900 w-full border-none bg-transparent"
+                              autoFocus
+                            />
+                          </>
+                        ) : (
+                          <div className="text-center text-gray-900 w-full">{cellValue}</div>
+                        )}
+                        <Image
+                          src="/assets/pencilIcon.svg"
+                          alt="pencil"
+                          width={16}
+                          height={16}
+                          className={cn('w-4 h-4 text-gray-500 cursor-pointer', {
+                            hidden: focusedCell === cell,
+                          })}
+                          onClick={() => handleFocus(cell)}
                         />
-                      ) : (
-                        <div className="text-center text-gray-900">{cellValue}</div>
-                      )}
-                      <Image src="/assets/pencilIcon.svg" alt="pencil" width={4} height={4} className="w-4 h-4 text-gray-500 cursor-pointer" onClick={() => handleFocus(cell)} />
-                    </form>
-                  </TableCell>
-                );
-              })}
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+                      </form>
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
