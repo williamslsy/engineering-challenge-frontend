@@ -9,16 +9,15 @@ import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 
 function Spreadsheet() {
-  const { cellValues, handleCellValueChange, handleBlur, handleFocus, clearCellValue, focusedCell, columns, rows } = useSpreadSheetContext();
-  const headers = Array.from({ length: columns }, (_, colIndex) => String.fromCharCode(65 + colIndex));
+  const { cellValues, handleCellValueChange, handleBlur, handleFocus, isError, handleSave, isSaving, focusedCell, columns, rows } = useSpreadSheetContext();
 
-  const isError = (cell: string) => {
-    const cellValue = cellValues[cell]?.value;
-    return cellValue === '#ERROR' || cellValue === '#CIRCULAR_REF';
-  };
+  const headers = Array.from({ length: columns }, (_, colIndex) => String.fromCharCode(65 + colIndex));
 
   return (
     <div>
+      <Button onClick={handleSave} className="mb-4" disabled={isSaving}>
+        {isSaving ? 'Saving Spreadsheet' : 'Save Spreadsheet'}
+      </Button>
       <Table className="w-full border-separate border-spacing-0">
         <TableHeader className="sticky top-0 z-10">
           <TableRow className="flex bg-defaultDarker rounded-lg mb-4 border-none">
@@ -54,14 +53,18 @@ function Spreadsheet() {
                   const cell = `${header}${rowId}`;
                   const cellValue = cellValues[cell]?.value || '';
                   let placeholder = '';
-                  if (header === 'C') {
-                    placeholder = `=A${rowId}*B${rowId}`;
+                  if (header === 'A') {
+                    placeholder = 'Enter a value like $1000';
+                  } else if (header === 'B') {
+                    placeholder = 'Enter a value like 15%';
+                  } else if (header === 'C') {
+                    placeholder = `Enter a formula like =A${rowId}*B${rowId}`;
                   }
 
                   return (
                     <TableCell
                       key={cell}
-                      className={cn('flex-1 flex items-center justify-center relative border-r', {
+                      className={cn('flex-1 flex items-center justify-center relative border-r overflow-hidden', {
                         'basis-30p4': index < headers.length - 1,
                         'basis-39p2': index === headers.length - 1,
                         'bg-highlight': focusedCell === cell,
@@ -86,7 +89,7 @@ function Spreadsheet() {
                             />
                           </>
                         ) : (
-                          <div className="text-center text-gray-900 w-full">{cellValue}</div>
+                          <div className="text-center text-gray-900 w-full truncate">{cellValue}</div>
                         )}
                         <Image
                           src="/assets/pencilIcon.svg"

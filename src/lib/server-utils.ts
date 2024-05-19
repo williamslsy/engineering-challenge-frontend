@@ -29,13 +29,15 @@ const checkProcessingStatus = async (id: string, retryCount = 0): Promise<Status
   if (data.status === Status.DONE) {
     toast({
       title: 'Success',
-      description: 'Processing completed successfully!',
+      description: 'Data Saved successfully!',
+      variant: 'success',
     });
     return Status.DONE;
   } else if (data.status === Status.IN_PROGRESS) {
     toast({
       title: 'Info',
-      description: 'Processing in progress. Please wait...',
+      description: 'Save in progress. Please wait...',
+      variant: 'info',
     });
     await delay(5000 * Math.pow(2, retryCount));
     return checkProcessingStatus(id, retryCount + 1);
@@ -58,23 +60,26 @@ const saveSpreadsheetData = async (cellValues: CellValues, rows: number, columns
   if (!response.ok) {
     toast({
       title: 'Error',
-      description: 'Server error while saving data',
+      description: 'Server error while saving data. Retrying now...',
       variant: 'destructive',
     });
     throw new Error('Server error');
   }
   const data: POSTResponse = await response.json();
+  console.log(data, 'actualdata');
 
   if (data.status === Status.DONE) {
     toast({
       title: 'Success',
       description: 'Data saved successfully!',
+      variant: 'success',
     });
     return Status.DONE;
   } else if (data.status === Status.IN_PROGRESS && data.id) {
     toast({
       title: 'Info',
-      description: 'Processing in progress. Please wait...',
+      description: 'Save in progress. Please wait...',
+      variant: 'info',
     });
     return checkProcessingStatus(data.id);
   }

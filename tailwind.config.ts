@@ -20,6 +20,8 @@ const config = {
       colors: {
         default: '#F3F3F3',
         defaultDarker: '#EFEFEF',
+        success: 'hsl(var(--success))',
+        info: 'hsl(var(--info))',
         cell: '#FAFAFA',
         highlight: '#DBEAFE',
         border: 'hsl(var(--border))',

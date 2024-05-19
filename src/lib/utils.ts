@@ -18,44 +18,53 @@ export const reduceZeros = (input: string) => {
 export const evaluateFormula = (formula: string, cellValues: CellValues, currentCell: string, visitedCells: Set<string> = new Set()): string | number => {
   console.log('Evaluating formula:', formula);
 
-  // Add the current cell to the set of visited cells
-  visitedCells.add(currentCell);
-
-  const match = formula.match(/([A-Z])(\d+)/g);
-  let evaluatedFormula = formula;
-
-  if (match) {
-    for (const refCell of match) {
-      const refCellFormula = cellValues[refCell]?.formula || '';
-
-      // Check if the referenced cell's formula includes the current cell
-      if (refCellFormula.includes(currentCell)) {
-        console.error('Circular dependency detected:', refCell);
-        toast({
-          title: 'Error',
-          description: 'Circular dependency detected',
-          variant: 'destructive',
-        });
-        return '#CIRCULAR_REF';
-      }
-
-      // If the referenced cell is the current cell, a circular dependency is detected
-      if (visitedCells.has(refCell)) {
-        console.error('Circular dependency detected:', refCell);
-        toast({
-          title: 'Error',
-          description: 'Circular dependency detected',
-          variant: 'destructive',
-        });
-        return '#CIRCULAR_REF';
-      }
-
-      console.log(`Replacing ${refCell} with value ${cellValues[refCell]?.value || '0'}`);
-      evaluatedFormula = evaluatedFormula.replace(refCell, (cellValues[refCell]?.value || '0').replace(/[^\d.%]/g, ''));
-    }
-  }
-
   try {
+    visitedCells.add(currentCell);
+
+    const invalidCharacters = /[^A-Z0-9+*-/(). ]/i;
+
+    if (invalidCharacters.test(formula)) {
+      toast({
+        title: 'Error',
+        description: 'Invalid or incomplete formula',
+        variant: 'destructive',
+      });
+      return '#ERROR';
+    }
+
+    const match = formula.match(/([A-Z])(\d+)/g);
+    let evaluatedFormula = formula;
+
+    // Handle circular references vulnerability
+    if (match) {
+      for (const refCell of match) {
+        const refCellFormula = cellValues[refCell]?.formula || '';
+
+        if (refCellFormula.includes(currentCell)) {
+          console.error('Circular dependency detected:', refCell);
+          toast({
+            title: 'Error',
+            description: 'Circular dependency detected',
+            variant: 'destructive',
+          });
+          return '#CIRCULAR_REF';
+        }
+
+        if (visitedCells.has(refCell)) {
+          console.error('Circular dependency detected:', refCell);
+          toast({
+            title: 'Error',
+            description: 'Circular dependency detected',
+            variant: 'destructive',
+          });
+          return '#CIRCULAR_REF';
+        }
+
+        console.log(`Replacing ${refCell} with value ${cellValues[refCell]?.value || '0'}`);
+        evaluatedFormula = evaluatedFormula.replace(refCell, (cellValues[refCell]?.value || '0').replace(/[^\d.%]/g, ''));
+      }
+    }
+
     const result = evaluate(evaluatedFormula) as number;
     console.log('Evaluation result:', result);
     return result;
