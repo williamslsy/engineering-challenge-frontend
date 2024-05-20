@@ -12,19 +12,13 @@
 ## Run the App
 
 1. Clone the repository:
-
    ```bash
-   git clone https://github.com/williamslsy/engineering-challenge-frontend.git
+   git clone https://github.com/williamslsy/engineering-challenge-frontend
    cd engineering-challenge-frontend
    ```
-
 2. Ensure Node.js is installed.
-
-### Development Commands
-
-1. Pull the Docker image and run the server (located [here](https://hub.docker.com/r/stakingrewards/engineering-frontend-challenge)).
-
-2. Run the development server:
+3. Pull the Docker image and run the server (located [here](https://hub.docker.com/r/stakingrewards/engineering-frontend-challenge)).
+4. Run the development server:
    ```bash
    yarn && yarn dev
    ```
@@ -61,18 +55,18 @@ The app should now be up and running.
 
 ### Building UI as Close to the Design as Possible
 
-**Shadcn-UI and TailwindCSS**:
+**Shadcn-ui and TailwindCSS**:
 
-- Shadcn/Radix-UI was used for consistent UI components.
+- Shadcn/Radix-ui was used for consistent UI components.
 - I employed TailwindCSS for custom styling and responsive design, ensuring the UI closely matched the provided design.
 
 ### Auto-Saving User Input
 
-**Performance Optimization**: Given the current server limitations and issues, I initially considered implementing a manual save approach to improve performance. However, to meet the task requirements, I opted for a dynamic approach that combines auto-save and manual save.
+**Performance Optimization**: Given the current server limitations and issues, I initially implemented a manual save approach to improve experience and performance. However, to meet the task requirements, I opted for a dynamic approach that includes the auto-save feature required.
 
 1. **Local Storage for Persistence**:
 
-   - `localStorage` was used to store user inputs, ensuring data persistence across sessions. This approach minimizes data loss and enhances user experience by maintaining state even when the page is refreshed.
+   - `localStorage` was used to store user inputs, ensuring data persistence across sessions. This approach minimizes data loss and enhances user experience by maintaining state even when the page is refreshed or when the user revisits.
 
 2. **Debounced Save to Endpoint**:
    - Implemented debouncing using `lodash.debounce` to delay the save operation until the user stops typing for a specified duration, reducing the number of server requests and improving performance.
@@ -102,23 +96,21 @@ The app should now be up and running.
 
 3. **Toast notifications**:
 
-   - significantly improve user experience by providing clear guidance and feedback.
+   - significantly improves user experience by providing clear guidance and feedback.
 
 4. **Extensive Error Handling**:
 
    - Implemented strict input validation and robust error handling for formula evaluation, preventing errors like the `Circular Dependency` from breaking the application and ensuring a resilient UI.
 
-5. **Code Maintainability**:
+5. **Code Maintanability and Optimized State Management with `Context API` and `useReducer`**:
 
-   - The use of custom hooks, `context API`, and `useReducer` promotes a clean and maintainable codebase, facilitating future enhancements and debugging.
+   - Refactored the context provider to use `useReducer` instead of `useState` for managing complex state logic. This allows for better separation of concerns and more efficient state updates, especially for complex state objects like `cellValues`. It also promotes a clean and maintainable codebase, facilitating future enhancements and debugging.
 
-6. **Optimized State Management with `useReducer`**:
-
-   - Refactored the context provider to use `useReducer` instead of `useState` for managing complex state logic. This allows for better separation of concerns and more efficient state updates, especially for complex state objects like `cellValues`.
-
-7. **Memoized Context Values**:
+6. **Memoized Context Values**:
 
    - Utilized `useMemo` to memoize the spreadsheet context value object, ensuring that it only changes when necessary, thus preventing unnecessary re-renders of all components consuming them.
 
-8. **Efficient State Initialization**:
+7. **Efficient State Initialization**:
    - Utilized `Array.from` and `reduce` for concise and efficient state initialization, minimizing computational overhead and improving performance.
+
+##### I'm eager to receive feedback on this. Please leave comments on areas for improvement. Thank you.
