@@ -8,7 +8,6 @@ export const SET_IS_SAVING = 'SET_IS_SAVING';
 export const SET_HAS_ERROR = 'SET_HAS_ERROR';
 export const SET_PREV_CELL_VALUES = 'SET_PREV_CELL_VALUES';
 
-// Define the state interface
 export interface SpreadSheetState {
   cellValues: CellValues;
   initialized: boolean;
@@ -17,7 +16,6 @@ export interface SpreadSheetState {
   hasError: boolean;
 }
 
-// Define the action interfaces
 interface SetCellValuesAction {
   type: typeof SET_CELL_VALUES;
   payload: CellValues;

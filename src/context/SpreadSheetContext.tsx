@@ -88,7 +88,6 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
     initializeCellValues();
   }, [rows, columns]);
 
-  // Update cell value handler
   const updateCellValue = useCallback(
     (cell: string, value: string, formula?: string | null) => {
       dispatch({
@@ -187,6 +186,10 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
           handleBlur(dependentCell);
         });
 
+        if (cellValues[cell]?.value === '#ERROR' || cellValues[cell]?.value === '#CIRCULAR_REF') {
+          updateCellValue(cell, '', null);
+        }
+
         dispatch({ type: SET_FOCUSED_CELL, payload: null });
       } catch (error) {
         console.error('An error occurred in handleBlur:', error);
@@ -204,8 +207,11 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
   const handleFocus = useCallback(
     (cell: string) => {
       const formula = cellValues[cell]?.formula;
+      const cellValue = cellValues[cell]?.value;
       if (formula) {
         updateCellValue(cell, formula);
+      } else if (cellValue === '#ERROR' || cellValue === '#CIRCULAR_REF') {
+        updateCellValue(cell, '', null);
       }
       dispatch({ type: SET_FOCUSED_CELL, payload: cell });
     },
