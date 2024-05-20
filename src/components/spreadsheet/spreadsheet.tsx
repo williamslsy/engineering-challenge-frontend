@@ -1,22 +1,35 @@
 'use client';
 
-import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import React, { useMemo } from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import useSpreadSheetContext from '@/hooks/useSpreadSheetContext';
 import Image from 'next/image';
-import { Input } from './ui/input';
+import { Input } from '../ui/input';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
+import { Button } from '../ui/button';
 
 function Spreadsheet() {
   const { cellValues, handleCellValueChange, handleBlur, handleFocus, isError, handleSave, isSaving, focusedCell, columns, rows } = useSpreadSheetContext();
 
-  const headers = Array.from({ length: columns }, (_, colIndex) => String.fromCharCode(65 + colIndex));
+  const headers = useMemo(() => Array.from({ length: columns }, (_, colIndex) => String.fromCharCode(65 + colIndex)), [columns]);
+
+  const getPlaceholder = (header: string, rowId: string): string => {
+    switch (header) {
+      case 'A':
+        return 'Enter a value like $1000';
+      case 'B':
+        return 'Enter a value like 15%';
+      case 'C':
+        return `Enter a formula like =A${rowId}*B${rowId}`;
+      default:
+        return '';
+    }
+  };
 
   return (
-    <div>
+    <main>
       <Button onClick={handleSave} className="mb-4" disabled={isSaving}>
-        {isSaving ? 'Saving Spreadsheet' : 'Save Spreadsheet'}
+        {isSaving ? 'Saving Spreadsheet ...' : 'Save Spreadsheet'}
       </Button>
       <Table className="w-full border-separate border-spacing-0">
         <TableHeader className="sticky top-0 z-10">
@@ -35,7 +48,7 @@ function Spreadsheet() {
           </TableRow>
         </TableHeader>
         <TableBody className="text-sm text-gray-900">
-          {[...Array(rows)].map((_, rowIndex) => {
+          {Array.from({ length: rows }, (_, rowIndex) => {
             const rowId = (rowIndex + 1).toString();
             const rowHasError = headers.some((header) => isError(`${header}${rowId}`));
             const rowIsFocused = headers.some((header) => focusedCell?.endsWith(rowId));
@@ -52,14 +65,6 @@ function Spreadsheet() {
                 {headers.map((header, index) => {
                   const cell = `${header}${rowId}`;
                   const cellValue = cellValues[cell]?.value || '';
-                  let placeholder = '';
-                  if (header === 'A') {
-                    placeholder = 'Enter a value like $1000';
-                  } else if (header === 'B') {
-                    placeholder = 'Enter a value like 15%';
-                  } else if (header === 'C') {
-                    placeholder = `Enter a formula like =A${rowId}*B${rowId}`;
-                  }
 
                   return (
                     <TableCell
@@ -70,24 +75,21 @@ function Spreadsheet() {
                         'bg-highlight': focusedCell === cell,
                         'shadow-md': focusedCell === cell,
                         'bg-opacity-70': rowIsFocused && focusedCell !== cell,
-
                         'last:border-none': index === headers.length - 1,
                       })}
                       onClick={() => handleFocus(cell)}
                     >
                       <form onSubmit={(e) => e.preventDefault()} className="flex justify-between items-center h-full w-full border-none">
                         {focusedCell === cell ? (
-                          <>
-                            <Input
-                              type="text"
-                              value={cellValue}
-                              onChange={(e) => handleCellValueChange(cell, e.target.value)}
-                              onBlur={() => handleBlur(cell)}
-                              placeholder={placeholder}
-                              className="text-center text-gray-900 w-full border-none bg-transparent"
-                              autoFocus
-                            />
-                          </>
+                          <Input
+                            type="text"
+                            value={cellValue}
+                            onChange={(e) => handleCellValueChange(cell, e.target.value)}
+                            onBlur={() => handleBlur(cell)}
+                            placeholder={getPlaceholder(header, rowId)}
+                            className="text-center text-gray-900 w-full border-none bg-transparent"
+                            autoFocus
+                          />
                         ) : (
                           <div className="text-center text-gray-900 w-full truncate">{cellValue}</div>
                         )}
@@ -110,7 +112,7 @@ function Spreadsheet() {
           })}
         </TableBody>
       </Table>
-    </div>
+    </main>
   );
 }
 

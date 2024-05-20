@@ -1,6 +1,6 @@
 import HeaderText from '@/components/header-text';
 import SearchBar from '@/components/search-bar';
-import Spreadsheet from '@/components/spreadsheet';
+import Spreadsheet from '@/components/spreadsheet/spreadsheet';
 import SpreadSheetProvider from '@/context/SpreadSheetContext';
 import { Suspense } from 'react';
 import Loading from './loading';

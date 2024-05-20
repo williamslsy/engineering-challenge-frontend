@@ -1,11 +1,13 @@
 'use client';
-import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
-import { evaluateFormula } from '@/lib/utils';
+
+import React, { createContext, useReducer, useEffect, useRef, useMemo, useCallback, ReactNode } from 'react';
+import { evaluateFormula, validateFullValue, validatePartialValue } from '@/lib/utils';
 import { Status, saveSpreadsheetData } from '@/lib/server-utils';
-import { debounce, has, set } from 'lodash';
+import { debounce } from 'lodash';
 import { toast } from '@/components/ui/use-toast';
 import { CellValues } from '@/lib/types';
 import Loading from '@/app/loading';
+import { SET_CELL_VALUES, SET_INITIALIZED, SET_FOCUSED_CELL, SET_IS_SAVING, SET_HAS_ERROR, spreadsheetReducer, SpreadSheetState } from '@/reducers/spreadsheet-reducers';
 
 interface SpreadSheetContextType {
   cellValues: CellValues;
@@ -25,23 +27,27 @@ interface SpreadSheetContextType {
 interface SpreadSheetProviderProps {
   rows: number;
   columns: number;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const SpreadSheetContext = createContext<SpreadSheetContextType | null>(null);
 
 const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderProps) => {
-  const [cellValues, setCellValues] = useState<CellValues>({});
-  const [initialized, setInitialized] = useState(false);
-  const [focusedCell, setFocusedCell] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const [state, dispatch] = useReducer(spreadsheetReducer, {
+    cellValues: {},
+    initialized: false,
+    focusedCell: null,
+    isSaving: false,
+    hasError: false,
+  } as SpreadSheetState);
+
+  const { cellValues, initialized, focusedCell, isSaving, hasError } = state;
   const prevCellValues = useRef<CellValues>({});
 
-  // Debounced save to endpoint
+  // Debounce save to endpoint function to avoid multiple calls
   const debouncedSaveToEndpoint = useRef(
     debounce(async () => {
-      setIsSaving(true);
+      dispatch({ type: SET_IS_SAVING, payload: true });
       try {
         const status = await saveSpreadsheetData(cellValues, rows, columns);
         if (status === Status.DONE) {
@@ -50,51 +56,55 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
       } catch (error) {
         console.error('Error saving data to endpoint:', error);
       } finally {
-        setIsSaving(false);
+        dispatch({ type: SET_IS_SAVING, payload: false });
       }
     }, 1000)
   ).current;
 
   const handleSave = useCallback(() => {
-    !hasError && debouncedSaveToEndpoint();
+    if (!hasError) debouncedSaveToEndpoint();
   }, [debouncedSaveToEndpoint, hasError]);
 
   useEffect(() => {
     const initializeCellValues = () => {
-      const getDataFromLocalStorage = localStorage.getItem('spreadsheetData');
-      if (getDataFromLocalStorage) {
-        setCellValues(JSON.parse(getDataFromLocalStorage) as CellValues);
+      const dataFromLocalStorage = localStorage.getItem('spreadsheetData');
+      if (dataFromLocalStorage) {
+        dispatch({ type: SET_CELL_VALUES, payload: JSON.parse(dataFromLocalStorage) });
         console.log('Loaded data from localStorage');
       } else {
-        // minimizes for loops by using reduce and spread operator to initialize cell values
-        const initialCellValues: CellValues = Array.from({ length: rows }, (_, rowIndex) =>
+        // minimize loops by using Array.from and reduce to create the initial cell values object
+        const initialCellValues = Array.from({ length: rows }, (_, rowIndex) =>
           Array.from({ length: columns }, (_, colIndex) => {
             const cell = String.fromCharCode(65 + colIndex) + (rowIndex + 1);
             return { [cell]: { value: '', formula: null } };
           }).reduce((acc, curr) => ({ ...acc, ...curr }), {})
         ).reduce((acc, curr) => ({ ...acc, ...curr }), {});
-        setCellValues(initialCellValues);
+        dispatch({ type: SET_CELL_VALUES, payload: initialCellValues });
         console.log('Initialized new cell values');
       }
-      setInitialized(true);
+      dispatch({ type: SET_INITIALIZED, payload: true });
     };
 
     initializeCellValues();
   }, [rows, columns]);
 
-  const updateCellValue = useCallback((cell: string, value: string, formula?: string | null) => {
-    setCellValues((prevCellValues) => {
-      const updatedCellValues = {
-        ...prevCellValues,
-        [cell]: {
-          ...prevCellValues[cell],
-          value,
-          formula: formula !== undefined ? formula : prevCellValues[cell].formula,
+  // Update cell value handler
+  const updateCellValue = useCallback(
+    (cell: string, value: string, formula?: string | null) => {
+      dispatch({
+        type: SET_CELL_VALUES,
+        payload: {
+          ...cellValues,
+          [cell]: {
+            ...cellValues[cell],
+            value,
+            formula: formula !== undefined ? formula : cellValues[cell].formula,
+          },
         },
-      };
-      return updatedCellValues;
-    });
-  }, []);
+      });
+    },
+    [cellValues]
+  );
 
   const handleCellValueChange = useCallback(
     (cell: string, value: string) => {
@@ -103,8 +113,16 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
       } else {
         if (value.trim() === '') {
           updateCellValue(cell, '', null);
-        } else {
+        } else if (validatePartialValue(value)) {
           updateCellValue(cell, value);
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Invalid value format',
+            variant: 'destructive',
+          });
+          dispatch({ type: SET_HAS_ERROR, payload: true });
+          updateCellValue(cell, '#ERROR', null);
         }
       }
     },
@@ -123,12 +141,11 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
         const formula = cellValues[cell]?.formula;
         let hasError = false;
         let hasChanged = false;
-        // Evaluate formula if it starts with '='
         if (formula && formula.startsWith('=')) {
           const result = evaluateFormula(formula.slice(1), cellValues, cell);
           if (result === '#ERROR' || result === '#CIRCULAR_REF') {
             hasError = true;
-            setHasError(true);
+            dispatch({ type: SET_HAS_ERROR, payload: true });
             if (cellValues[cell]?.value !== result.toString()) {
               hasChanged = true;
             }
@@ -142,17 +159,14 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
           }
         } else {
           const value = cellValues[cell]?.value || '';
-          // Matches values like $1000, 1000, 5%, 1000.00, $1000.00 etc.
-          const validValueRegex = /^(\$?\d+(\.\d+)?%?)$/;
-
-          if (value && !validValueRegex.test(value)) {
+          if (value && !validateFullValue(value)) {
             toast({
               title: 'Error',
               description: 'Invalid value format',
               variant: 'destructive',
             });
             hasError = true;
-            setHasError(true);
+            dispatch({ type: SET_HAS_ERROR, payload: true });
             updateCellValue(cell, '#ERROR', value);
           } else {
             if (cellValues[cell]?.value !== value) {
@@ -163,12 +177,17 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
         }
 
         if (hasChanged && !hasError) {
-          setHasError(false);
+          dispatch({ type: SET_HAS_ERROR, payload: false });
           handleSave();
           saveToLocalStorage();
         }
 
-        setFocusedCell(null);
+        const dependentCells = Object.keys(cellValues).filter((key) => cellValues[key]?.formula?.includes(cell));
+        dependentCells.forEach((dependentCell) => {
+          handleBlur(dependentCell);
+        });
+
+        dispatch({ type: SET_FOCUSED_CELL, payload: null });
       } catch (error) {
         console.error('An error occurred in handleBlur:', error);
         toast({
@@ -188,7 +207,7 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
       if (formula) {
         updateCellValue(cell, formula);
       }
-      setFocusedCell(cell);
+      dispatch({ type: SET_FOCUSED_CELL, payload: cell });
     },
     [cellValues, updateCellValue]
   );
@@ -196,16 +215,19 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
   const clearCellValue = useCallback(
     (cell: string) => {
       updateCellValue(cell, '', null);
-      setFocusedCell(null);
+      dispatch({ type: SET_FOCUSED_CELL, payload: null });
       saveToLocalStorage();
     },
     [updateCellValue, saveToLocalStorage]
   );
 
-  const isError = (cell: string) => {
-    const cellValue = cellValues[cell]?.value;
-    return cellValue === '#ERROR' || cellValue === '#CIRCULAR_REF';
-  };
+  const isError = useCallback(
+    (cell: string) => {
+      const cellValue = cellValues[cell]?.value;
+      return cellValue === '#ERROR' || cellValue === '#CIRCULAR_REF';
+    },
+    [cellValues]
+  );
 
   useEffect(() => {
     if (initialized) {
@@ -224,7 +246,7 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
     if (hasChanges) {
       Object.entries(cellValues).forEach(([cell, { formula }]) => {
         if (formula && formula.startsWith('=')) {
-          const result = evaluateFormula(formula.slice(1), cellValues, cell); // Pass the current cell
+          const result = evaluateFormula(formula.slice(1), cellValues, cell);
           updateCellValue(cell, typeof result === 'number' ? parseFloat(result.toFixed(2)).toString() : result);
         }
       });
@@ -232,34 +254,29 @@ const SpreadSheetProvider = ({ rows, columns, children }: SpreadSheetProviderPro
     }
   }, [cellValues, focusedCell, updateCellValue]);
 
+  const spreadsheetContextValue = useMemo(
+    () => ({
+      cellValues,
+      updateCellValue,
+      handleCellValueChange,
+      handleBlur,
+      handleFocus,
+      clearCellValue,
+      handleSave,
+      isSaving,
+      isError,
+      focusedCell,
+      rows,
+      columns,
+    }),
+    [cellValues, updateCellValue, handleCellValueChange, handleBlur, handleFocus, clearCellValue, handleSave, isSaving, isError, focusedCell, rows, columns]
+  );
+
   if (!initialized) {
-    return (
-      <>
-        <Loading />
-      </>
-    );
+    return <Loading />;
   }
 
-  return (
-    <SpreadSheetContext.Provider
-      value={{
-        cellValues,
-        updateCellValue,
-        handleCellValueChange,
-        handleBlur,
-        handleFocus,
-        clearCellValue,
-        handleSave,
-        isSaving,
-        isError,
-        focusedCell,
-        rows,
-        columns,
-      }}
-    >
-      {children}
-    </SpreadSheetContext.Provider>
-  );
+  return <SpreadSheetContext.Provider value={spreadsheetContextValue}>{children}</SpreadSheetContext.Provider>;
 };
 
 export default SpreadSheetProvider;
